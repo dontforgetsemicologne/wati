@@ -5,6 +5,16 @@ import type { WatiAdapterConfig } from "./types";
 
 const DEFAULT_USER_NAME = "wati-bot";
 
+/**
+ * Create a Wati WhatsApp adapter for Chat SDK.
+ *
+ * Reads `WATI_API_URL`, `WATI_ACCESS_TOKEN`, `WATI_WEBHOOK_SECRET`, and
+ * `WATI_BOT_USERNAME` from the environment when fields are not provided in
+ * `config`. Throws `ValidationError` if a required credential is missing.
+ *
+ * @param config - Adapter configuration. All fields are optional when the
+ *   matching environment variable is set.
+ */
 export function createWatiAdapter(config?: WatiAdapterConfig): WatiAdapter {
   const logger = config?.logger ?? new ConsoleLogger("info").child("wati");
   const accessToken = config?.accessToken ?? process.env.WATI_ACCESS_TOKEN;
