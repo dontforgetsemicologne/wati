@@ -1,11 +1,9 @@
-[![WhatsApp Team Inbox adapter for Chat SDK](https://chat-sdk.dev/en/adapters/official/whatsapp/og)](https://github.com/dontforgetsemicologne/wati.git)
-
 # @wati/wati-adapter
 
-> npm package: [`@wati/wati-adapter`](https://www.npmjs.com/package/@wati/wati-adapter)
-
-[![Agent Stack](https://img.shields.io/badge/Agent%20Stack-000?style=flat-square&logo=vercel&logoColor=FFF&labelColor=000&color=000)](https://vercel.com/kb/agent-stack)
+[![npm version](https://img.shields.io/npm/v/@wati/wati-adapter)](https://www.npmjs.com/package/@wati/wati-adapter)
+[![npm downloads](https://img.shields.io/npm/dm/@wati/wati-adapter)](https://www.npmjs.com/package/@wati/wati-adapter)
 [![MIT License](https://img.shields.io/badge/License-MIT-000?style=flat-square&logo=opensourceinitiative&logoColor=white&labelColor=000&color=000)](../../LICENCE)
+[![Agent Stack](https://img.shields.io/badge/Agent%20Stack-000?style=flat-square&logo=vercel&logoColor=FFF&labelColor=000&color=000)](https://vercel.com/kb/agent-stack)
 
 WhatsApp Team Inbox adapter for [Chat SDK](https://chat-sdk.dev), using the [Wati WhatsApp Business API](https://docs.wati.io/reference/introduction). Wati is a WhatsApp Business API platform that adds an inbox, broadcasts, templates, and multi-channel support on top of WhatsApp's Cloud API.
 
@@ -14,7 +12,7 @@ Documentation: [Wati API reference](https://docs.wati.io/reference/introduction)
 ## Installation
 
 ```bash
-pnpm add 
+pnpm add chat @wati/wati-adapter
 ```
 
 ## Usage
@@ -26,7 +24,11 @@ import { createWatiAdapter } from "@wati/wati-adapter";
 const bot = new Chat({
   userName: "mybot",
   adapters: {
-    wati: createWatiAdapter(),
+    wati: createWatiAdapter({
+      apiUrl: process.env.WATI_API_URL!,
+      accessToken: process.env.WATI_ACCESS_TOKEN!,
+      webhookSecret: process.env.WATI_WEBHOOK_SECRET!,
+    }),
   },
 });
 
@@ -35,9 +37,28 @@ bot.onNewMention(async (thread, message) => {
 });
 ```
 
-When using `createWatiAdapter()` without arguments, credentials are auto-detected from environment variables.
+All options are auto-detected from environment variables when not provided, so `createWatiAdapter()` can be called with no arguments if `WATI_API_URL`, `WATI_ACCESS_TOKEN`, and `WATI_WEBHOOK_SECRET` are set.
 
-## Wati setup
+## Environment variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `WATI_API_URL` | Yes | Tenant API endpoint, e.g. `https://live-mt-server-XXXXX.wati.io` |
+| `WATI_ACCESS_TOKEN` | Yes | Wati API token (generate under **Connector → API**) |
+| `WATI_WEBHOOK_SECRET` | Yes | Secret used to verify inbound webhook requests |
+| `WATI_BOT_USERNAME` | No | Bot display name (defaults to `wati-bot`) |
+
+## Configuration
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `apiUrl` | `string` | `WATI_API_URL` | Wati tenant API base URL |
+| `accessToken` | `string` | `WATI_ACCESS_TOKEN` | Wati API token |
+| `webhookSecret` | `string` | `WATI_WEBHOOK_SECRET` | Secret for verifying inbound webhooks |
+| `userName` | `string` | `WATI_BOT_USERNAME` or `"wati-bot"` | Bot display name used for self-message detection |
+| `logger` | `Logger` | `ConsoleLogger("info")` | Logger instance for error reporting |
+
+## Platform setup
 
 ### 1. Create a Wati account
 
@@ -53,39 +74,16 @@ When using `createWatiAdapter()` without arguments, credentials are auto-detecte
 
 ### 3. Configure webhooks
 
-1. In Wati, go to **Settings → API → Webhooks** (or use `adapter.createWebhooks(...)`)
-2. Set the **webhook URL** to `https://your-domain.com/api/webhooks/wati` and subscribe to the `message` event type
-3. Protect the endpoint with a secret — the adapter accepts it in the `x-wati-webhook-secret` header or as a `/webhook/<secret>` path segment
-
-## Configuration
-
-All options are auto-detected from environment variables when not provided. You can call `createWatiAdapter()` with no arguments if the env vars are set.
-
-| Option | Required | Description |
-|--------|----------|-------------|
-| `accessToken` | No* | Wati API token. Auto-detected from `WATI_ACCESS_TOKEN` |
-| `apiUrl` | No* | Wati tenant API base URL. Auto-detected from `WATI_API_URL` |
-| `webhookSecret` | No* | Secret used to verify inbound webhooks. Auto-detected from `WATI_WEBHOOK_SECRET` |
-| `userName` | No | Bot username for self-message detection. Auto-detected from `WATI_BOT_USERNAME` (defaults to `wati-bot`) |
-| `logger` | No | Logger instance (defaults to `ConsoleLogger("info")`) |
-
-*Required at runtime — either via config or environment variable.
-
-## Environment variables
-
-```bash
-WATI_ACCESS_TOKEN=...          # Wati API token (generate under Connector → API)
-WATI_API_URL=...               # Tenant endpoint, e.g. https://live-mt-server-XXXXX.wati.io
-WATI_WEBHOOK_SECRET=...        # Secret for webhook request verification
-WATI_BOT_USERNAME=...          # Optional, defaults to "wati-bot"
-```
-
-## Webhook setup
-
 Wati delivers events as POST requests. The adapter verifies them using a shared secret supplied in one of two ways:
 
 1. **Header** — `x-wati-webhook-secret: <your-secret>`
 2. **Path** — register a webhook URL ending in `/webhook/<your-secret>`
+
+To set the webhook up in Wati:
+
+1. In Wati, go to **Settings → API → Webhooks** (or use `adapter.createWebhooks(...)`)
+2. Set the **webhook URL** to `https://your-domain.com/api/webhooks/wati` and subscribe to the `message` event type
+3. Protect the endpoint with the same secret you set as `WATI_WEBHOOK_SECRET`
 
 ```typescript
 // Next.js App Router example
@@ -98,70 +96,22 @@ export async function POST(request: Request) {
 
 ## Features
 
-### Messaging
+- Mentions and DMs on WhatsApp
+- Text, images, documents, audio, video, stickers
+- Locations (rendered as `[Location: lat, lng]`)
+- Interactive reply buttons (up to 3 per message, 20-char title limit) and list messages
+- Reactions (inbound; outbound not exposed by the Wati API)
+- Template messages for business-initiated conversations outside the 24-hour window
+- Scheduled template messages
+- Auto-chunking of long messages at 4096 characters
+- Admin APIs for channels, contacts, templates, and conversation status
 
-| Feature | Supported |
-|---------|-----------|
-| Post message | Yes |
-| Edit message | No (Wati API limitation) |
-| Delete message | No (Wati API limitation) |
-| Streaming | Buffered (accumulates then sends) |
-| Mark as read | No (not exposed by Wati API v3) |
-| Auto-chunking | Yes (splits at 4096 chars) |
-| Template messages | Yes (via `sendTemplate`) |
-| Scheduled templates | Yes (via `scheduleTemplate`) |
+### Limitations
 
-### Rich content
-
-| Feature | Supported |
-|---------|-----------|
-| Interactive buttons | Yes (up to 3) |
-| Button title limit | 20 characters |
-| List messages | Yes |
-| Text fallback | Yes (for >3 buttons) |
-
-### Conversations
-
-| Feature | Supported |
-|---------|-----------|
-| Reactions | Inbound yes, outbound no |
-| Typing indicator | No (not exposed by Wati API v3) |
-| DMs | Yes |
-| Open DM | Yes |
-| Assign operator | Yes (via `assignOperator`) |
-| Update conversation status | Yes (via `updateConversationStatus`) |
-
-### Incoming message types
-
-| Type | Supported |
-|------|-----------|
-| Text | Yes |
-| Images | Yes (with captions) |
-| Documents | Yes (with captions) |
-| Audio / Voice | Yes |
-| Video | Yes (with captions) |
-| Stickers | Yes |
-| Locations | Yes (converted to `[Location: lat, lng]`) |
-| Interactive replies | Yes (button and list) |
-| Reactions | Yes |
-
-### Message history
-
-| Feature | Supported |
-|---------|-----------|
-| Fetch messages | Yes (paginated via `fetchMessages`) |
-| Fetch thread info | Yes |
-
-### Admin APIs
-
-Beyond the `Adapter` interface, the adapter exposes the Wati API namespaces for admin operations:
-
-```typescript
-const channels = await adapter.getChannels();
-const contacts = await adapter.getContacts();
-const templates = await adapter.getMessageTemplates();
-await adapter.updateConversationStatus(threadId, "solved");
-```
+- Edit and delete are not supported (Wati API limitation)
+- Streaming is buffered — text is accumulated and sent as a single message
+- Mark-as-read and outbound typing indicators are not exposed by Wati API v3
+- Callback buttons are rejected because Wati's interactive schema has no hidden ID field — use a regular `onAction` button with a visible label
 
 ## Interactive messages
 
@@ -195,6 +145,17 @@ wati:{base64url(waId)}
 
 Example: `wati:MTQxNTU1NTI2NzE` (decodes to `14155552671`)
 
+## Admin APIs
+
+Beyond the `Adapter` interface, the adapter exposes the Wati API namespaces for admin operations:
+
+```typescript
+const channels = await adapter.getChannels();
+const contacts = await adapter.getContacts();
+const templates = await adapter.getMessageTemplates();
+await adapter.updateConversationStatus(threadId, "solved");
+```
+
 ## Troubleshooting
 
 ### Webhook requests returning 401
@@ -202,7 +163,7 @@ Example: `wati:MTQxNTU1NTI2NzE` (decodes to `14155552671`)
 - Confirm the `x-wati-webhook-secret` header (or the `/webhook/<secret>` path segment) matches `WATI_WEBHOOK_SECRET`
 - Ensure you subscribed to the webhook in the Wati dashboard and the endpoint is reachable
 
-### "accessToken is required" from `createWatiAdapter()`
+### `ValidationError: accessToken is required` from `createWatiAdapter()`
 
 - Set `WATI_ACCESS_TOKEN` or pass `accessToken` in the config object
 
